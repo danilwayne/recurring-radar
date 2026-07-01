@@ -39,9 +39,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // ── 3. Stripe + admin client ───────────────────────────────────────────
-        const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
-        console.log('[checkout] step3: stripeKey present?', !!stripeKey)
-        const stripe = new Stripe(stripeKey!, {
+        const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
             apiVersion: '2024-06-20',
             httpClient: Stripe.createFetchHttpClient(),
         })
@@ -52,20 +50,17 @@ Deno.serve(async (req: Request) => {
         )
 
         // ── 4. Get user row ────────────────────────────────────────────────────
-        console.log('[checkout] step4: fetching user row')
-        const { data: row, error: rowError } = await supabaseAdmin
+        const { data: row } = await supabaseAdmin
             .from('users')
             .select('plan, stripe_customer_id')
             .eq('id', user.id)
             .single()
-        console.log('[checkout] step4 result: row=', JSON.stringify(row), 'error=', rowError?.message)
 
         if (row?.plan === 'pro') {
             return json({ error: 'Usuário já possui o plano Pro.' }, 400)
         }
 
         // ── 5. Get or create Stripe customer ───────────────────────────────────
-        console.log('[checkout] step5: customer')
         let customerId: string
         if (row?.stripe_customer_id) {
             customerId = row.stripe_customer_id
@@ -80,16 +75,13 @@ Deno.serve(async (req: Request) => {
                 .update({ stripe_customer_id: customerId })
                 .eq('id', user.id)
         }
-        console.log('[checkout] step5 done: customerId=', customerId)
 
         // ── 6. Get price from plans table ─────────────────────────────────────
-        console.log('[checkout] step6: fetching price')
         const { data: planRow, error: planError } = await supabaseAdmin
             .from('plans')
             .select('stripe_price_id')
             .eq('id', 'pro')
             .single()
-        console.log('[checkout] step6 result: planRow=', JSON.stringify(planRow), 'planError=', planError?.message)
 
         if (planError || !planRow?.stripe_price_id) {
             return json({ error: 'Preço do plano Pro não configurado. Contate o suporte.' }, 500)
