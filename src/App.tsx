@@ -14,6 +14,7 @@ import ImportWizard from "./components/ImportWizard";
 import { useRadarBrief } from "./hooks/useRadarBrief";
 import { usePlan } from "./hooks/usePlan";
 import { UpgradeModal } from "./components/UpgradeModal";
+import { WhatsAppButton } from "./components/WhatsAppButton";
 
 const CATEGORIES = ["Todas", "Comunicação", "Design", "Produtividade", "CRM", "Desenvolvimento", "Analytics", "Suporte"];
 
@@ -1704,6 +1705,7 @@ export default function App() {
                     </main>
                 </>
             )}
+            <WhatsAppButton />
         </div>
     );
 }
