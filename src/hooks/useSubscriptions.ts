@@ -16,6 +16,7 @@ export interface Subscription {
     status: string
     usage_score: number
     renew_date: string | null
+    data_source: 'manual' | 'csv' | 'integration:google' | 'integration:slack' | 'integration:microsoft' | 'integration:notion'
     created_at: string
     updated_at: string
 }
@@ -58,11 +59,13 @@ export function useSubscriptions(user: User | null) {
     }, [user])
 
     const fetchSubscriptions = async () => {
+        if (!user?.id) return
         try {
             setLoading(true)
             const { data, error } = await supabase
                 .from('subscriptions')
                 .select('*')
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
 
             if (error) throw error
@@ -76,37 +79,35 @@ export function useSubscriptions(user: User | null) {
     }
 
     const addSubscription = async (sub: Omit<Subscription, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-        try {
-            const { error } = await supabase.from('subscriptions').insert([{ ...sub, user_id: user?.id }])
-            if (error) throw error
-            await fetchSubscriptions()
-        } catch (err) {
-            throw err instanceof Error ? err : new Error('Erro ao adicionar assinatura')
-        }
+        if (!user?.id) throw new Error('Usuário não autenticado')
+        const payload = { ...sub, user_id: user.id }
+        const { error } = await supabase.from('subscriptions').insert([payload])
+        if (error) throw new Error(error.message)
+        await fetchSubscriptions()
+    }
+
+    const batchAddSubscriptions = async (list: Omit<Subscription, 'id' | 'user_id' | 'created_at' | 'updated_at'>[]) => {
+        if (list.length === 0) return
+        if (!user?.id) throw new Error('Usuário não autenticado')
+        const payloads = list.map(sub => ({ ...sub, user_id: user.id }))
+        const { error } = await supabase.from('subscriptions').insert(payloads)
+        if (error) throw new Error(error.message)
+        await fetchSubscriptions()
     }
 
     const updateSubscription = async (id: string, updates: Partial<Subscription>) => {
-        try {
-            const { error } = await supabase
-                .from('subscriptions')
-                .update(updates)
-                .eq('id', id)
-
-            if (error) throw error
-            await fetchSubscriptions()
-        } catch (err) {
-            throw err instanceof Error ? err : new Error('Erro ao atualizar assinatura')
-        }
+        const { error } = await supabase
+            .from('subscriptions')
+            .update(updates)
+            .eq('id', id)
+        if (error) throw new Error(error.message)
+        await fetchSubscriptions()
     }
 
     const deleteSubscription = async (id: string) => {
-        try {
-            const { error } = await supabase.from('subscriptions').delete().eq('id', id)
-            if (error) throw error
-            await fetchSubscriptions()
-        } catch (err) {
-            throw err instanceof Error ? err : new Error('Erro ao deletar assinatura')
-        }
+        const { error } = await supabase.from('subscriptions').delete().eq('id', id)
+        if (error) throw new Error(error.message)
+        await fetchSubscriptions()
     }
 
     return {
@@ -114,6 +115,7 @@ export function useSubscriptions(user: User | null) {
         loading,
         error,
         addSubscription,
+        batchAddSubscriptions,
         updateSubscription,
         deleteSubscription,
     }
